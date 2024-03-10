@@ -103,34 +103,6 @@ trainer = Trainer(
 # Train the model
 trainer.train()
 
-model.eval()  # Ensure the model is in evaluation mode before quantization
-quantized_model = torch.quantization.quantize_dynamic(
-    model, {torch.nn.Linear}, dtype=torch.qint8
-)
-
-# Save the quantized model
-quantized_model.save_pretrained("./quantized_model")
-
-# To load the quantized model
-model = DistilBertForSequenceClassification.from_pretrained("./quantized_model")
-model.eval()
-
-texts = ["This is an example sentence.", "Fuck you."]
-
-# Tokenize the texts
-inputs = tokenizer(texts, padding=True, truncation=True, return_tensors="pt")
-
-# Predict with the quantized model
-with torch.no_grad():
-    outputs = model(**inputs)
-
-# Process the outputs (for example, by taking the argmax to get the most likely class)
-predictions = torch.argmax(outputs.logits, dim=1)
-
-# Convert predictions to readable labels
-# Assuming you have a binary classification problem with labels 0 and 1
-labels = ["Not Offensive", "Offensive"]
-predicted_labels = [labels[prediction] for prediction in predictions]
-
-for text, predicted_label in zip(texts, predicted_labels):
-    print(f"Text: {text}\nPredicted label: {predicted_label}\n")
+# save it
+model.save_pretrained("./pardonmyai")
+tokenizer.save_pretrained("./pardonmyai")
