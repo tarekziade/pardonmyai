@@ -1,3 +1,6 @@
+"""
+Fine-tune a Distilbert model on a profanity dataset.
+"""
 import torch
 import evaluate
 import pandas as pd
