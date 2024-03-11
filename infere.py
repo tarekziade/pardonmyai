@@ -1,3 +1,6 @@
+"""
+Infere the text passed in the CLI
+"""
 import sys
 import time
 from transformers import pipeline
