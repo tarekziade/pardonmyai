@@ -6,3 +6,4 @@ accelerate
 numpy
 evaluate
 scikit-learn
+tqdm
