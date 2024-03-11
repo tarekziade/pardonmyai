@@ -3,8 +3,7 @@ Fine-tune a Distilbert model on a profanity dataset.
 """
 import torch
 import evaluate
-import pandas as pd
-from datasets import Dataset
+from datasets import load_dataset
 import numpy as np
 from transformers import DataCollatorWithPadding
 from transformers import (
@@ -13,6 +12,13 @@ from transformers import (
     Trainer,
     TrainingArguments,
 )
+
+
+BASE_MODEL = "distilbert-base-uncased"
+DATASET = "tarekziade/profanity"
+ID2LABEL = {0: "NOT_OFFENSIVE", 1: "OFFENSIVE"}
+LABEL2ID = {"NOT_OFFENSIVE": 0, "OFFENSIVE": 1}
+MODEL_PATH = "./pardonmyai"
 
 
 accuracy = evaluate.load("accuracy")
@@ -27,48 +33,21 @@ else:
     device = torch.device("cpu")
     print("Using CPU.")
 
-# Load the data
-df = pd.read_csv("clean_data.csv")
-dataset = Dataset.from_pandas(df)
 
+def get_datasets():
+    dataset = load_dataset("tarekziade/profanity", split="train")
+    dataset = dataset.rename_column("is_offensive", "label")
 
-def filter_empty_texts(example):
-    return example["text"] is not None and example["text"].strip() != ""
+    def tokenize_function(examples):
+        return tokenizer(
+            examples["text"],
+            padding="max_length",
+            truncation=True,
+            max_length=512,
+        )
 
-
-dataset = dataset.filter(filter_empty_texts)
-dataset = dataset.rename_column("is_offensive", "label")
-
-
-def tokenize_function(examples):
-    return tokenizer(
-        examples["text"],
-        padding="max_length",
-        truncation=True,
-        max_length=512,
-    )
-
-
-id2label = {0: "NOT_OFFENSIVE", 1: "OFFENSIVE"}
-label2id = {"NOT_OFFENSIVE": 0, "OFFENSIVE": 1}
-
-
-# Load tokenizer
-tokenizer = DistilBertTokenizer.from_pretrained("distilbert-base-uncased")
-
-data_collator = DataCollatorWithPadding(tokenizer=tokenizer)
-
-# Tokenize the dataset
-tokenized_datasets = dataset.map(tokenize_function, batched=True)
-
-# Split the dataset into training and testing
-tokenized_datasets = tokenized_datasets.train_test_split(test_size=0.2)
-
-# Load the model
-model = DistilBertForSequenceClassification.from_pretrained(
-    "distilbert-base-uncased", num_labels=2, id2label=id2label, label2id=label2id
-)
-model.to(device)
+    tokenized_datasets = dataset.map(tokenize_function, batched=True)
+    return tokenized_datasets.train_test_split(test_size=0.2)
 
 
 def compute_metrics(eval_pred):
@@ -77,7 +56,6 @@ def compute_metrics(eval_pred):
     return accuracy.compute(predictions=predictions, references=labels)
 
 
-# Define training arguments
 training_args = TrainingArguments(
     output_dir="./results",
     num_train_epochs=3,
@@ -92,20 +70,32 @@ training_args = TrainingArguments(
     logging_dir="./logs",
 )
 
-# Initialize the Trainer
-trainer = Trainer(
-    tokenizer=tokenizer,
-    model=model,
-    args=training_args,
-    data_collator=data_collator,
-    train_dataset=tokenized_datasets["train"],
-    eval_dataset=tokenized_datasets["test"],
-    compute_metrics=compute_metrics,  # You can define a compute_metrics function for evaluation
-)
 
-# Train the model
-trainer.train()
+def train():
+    tokenizer = DistilBertTokenizer.from_pretrained(BASE_MODEL)
+    model = DistilBertForSequenceClassification.from_pretrained(
+        BASE_MODEL, num_labels=2, id2label=ID2LABEL, label2id=LABEL2ID
+    )
+    model.to(device)
 
-# save it
-model.save_pretrained("./pardonmyai")
-tokenizer.save_pretrained("./pardonmyai")
+    datasets = get_datasets()
+
+    trainer = Trainer(
+        tokenizer=tokenizer,
+        model=model,
+        args=training_args,
+        data_collator=DataCollatorWithPadding(tokenizer=tokenizer),
+        train_dataset=datasets["train"],
+        eval_dataset=datasets["test"],
+        compute_metrics=compute_metrics,  # You can define a compute_metrics function for evaluation
+    )
+
+    try:
+        trainer.train()
+    finally:
+        model.save_pretrained(MODEL_PATH)
+        tokenizer.save_pretrained(MODEL_PATH)
+
+
+if __name__ == "__main__":
+    train()
