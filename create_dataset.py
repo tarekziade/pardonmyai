@@ -1,3 +1,6 @@
+"""
+This script converts the original CSV file to a clean JSON file.
+"""
 import pandas as pd
 from datasets import Dataset
 
