@@ -9,7 +9,9 @@ import numpy as np
 from transformers import DataCollatorWithPadding
 from transformers import (
     DistilBertTokenizer,
+    BertTokenizer,
     DistilBertForSequenceClassification,
+    BertForSequenceClassification,
     Trainer,
     TrainingArguments,
 )
@@ -77,12 +79,16 @@ def train(tiny=False):
     if tiny:
         model_name = TINY_BASE_MODEL
         model_path = MODEL_PATH + "-tiny"
+        tokenizer_klass = BertTokenizer
+        model_klass = BertForSequenceClassification
     else:
         model_name = BASE_MODEL
         model_path = MODEL_PATH
+        tokenizer_klass = DistilBertTokenizer
+        model_klass = DistilBertForSequenceClassification
 
-    tokenizer = DistilBertTokenizer.from_pretrained(model_name)
-    model = DistilBertForSequenceClassification.from_pretrained(
+    tokenizer = tokenizer_klass.from_pretrained(model_name)
+    model = model_klass.from_pretrained(
         model_name, num_labels=2, id2label=ID2LABEL, label2id=LABEL2ID
     )
     model.to(device)
