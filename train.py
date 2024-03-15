@@ -1,6 +1,7 @@
 """
 Fine-tune a Distilbert model on a profanity dataset.
 """
+import argparse
 import torch
 import evaluate
 from datasets import load_dataset
@@ -15,6 +16,7 @@ from transformers import (
 
 
 BASE_MODEL = "distilbert-base-uncased"
+TINY_BASE_MODEL = "huawei-noah/TinyBERT_General_4L_312D"
 DATASET = "tarekziade/profanity"
 ID2LABEL = {0: "NOT_OFFENSIVE", 1: "OFFENSIVE"}
 LABEL2ID = {"NOT_OFFENSIVE": 0, "OFFENSIVE": 1}
@@ -34,7 +36,7 @@ else:
     print("Using CPU.")
 
 
-def get_datasets():
+def get_datasets(tokenizer):
     dataset = load_dataset("tarekziade/profanity", split="train")
     dataset = dataset.rename_column("is_offensive", "label")
 
@@ -71,14 +73,21 @@ training_args = TrainingArguments(
 )
 
 
-def train():
-    tokenizer = DistilBertTokenizer.from_pretrained(BASE_MODEL)
+def train(tiny=False):
+    if tiny:
+        model_name = TINY_BASE_MODEL
+        model_path = MODEL_PATH + "-tiny"
+    else:
+        model_name = BASE_MODEL
+        model_path = MODEL_PATH
+
+    tokenizer = DistilBertTokenizer.from_pretrained(model_name)
     model = DistilBertForSequenceClassification.from_pretrained(
-        BASE_MODEL, num_labels=2, id2label=ID2LABEL, label2id=LABEL2ID
+        model_name, num_labels=2, id2label=ID2LABEL, label2id=LABEL2ID
     )
     model.to(device)
 
-    datasets = get_datasets()
+    datasets = get_datasets(tokenizer)
 
     trainer = Trainer(
         tokenizer=tokenizer,
@@ -93,9 +102,17 @@ def train():
     try:
         trainer.train()
     finally:
-        model.save_pretrained(MODEL_PATH)
-        tokenizer.save_pretrained(MODEL_PATH)
+        model.save_pretrained(model_path)
+        tokenizer.save_pretrained(model_path)
 
 
 if __name__ == "__main__":
-    train()
+    parser = argparse.ArgumentParser(description="Train the profanity model")
+    parser.add_argument(
+        "--tiny",
+        action="store_true",
+        help="Enable the tiny mode.",
+    )
+    args = parser.parse_args()
+
+    train(args.tiny)
