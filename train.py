@@ -1,6 +1,7 @@
 """
 Fine-tune a Distilbert model on a profanity dataset.
 """
+from codecarbon import track_emissions
 import argparse
 import torch
 import evaluate
@@ -15,6 +16,7 @@ from transformers import (
     Trainer,
     TrainingArguments,
 )
+from transformers.trainer_callback import EarlyStoppingCallback
 
 
 BASE_MODEL = "distilbert-base-uncased"
@@ -75,6 +77,7 @@ training_args = TrainingArguments(
 )
 
 
+@track_emissions(project_name="PardonMyAI")
 def train(tiny=False):
     if tiny:
         model_name = TINY_BASE_MODEL
@@ -102,7 +105,8 @@ def train(tiny=False):
         data_collator=DataCollatorWithPadding(tokenizer=tokenizer),
         train_dataset=datasets["train"],
         eval_dataset=datasets["test"],
-        compute_metrics=compute_metrics,  # You can define a compute_metrics function for evaluation
+        compute_metrics=compute_metrics,
+        callbacks=[EarlyStoppingCallback(early_stopping_patience=3)],
     )
 
     try:

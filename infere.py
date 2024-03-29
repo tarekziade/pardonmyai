@@ -8,7 +8,7 @@ from transformers import pipeline
 
 if __name__ == "__main__":
     print("Loading model...")
-    classifier = pipeline("sentiment-analysis", model="tarekziade/pardonmyai")
+    classifier = pipeline("sentiment-analysis", model="./pardonmyai")
 
     start = time.time()
     res = classifier(sys.argv[-1])

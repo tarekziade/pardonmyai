@@ -18,9 +18,10 @@ from tqdm import tqdm
 from datasets import load_dataset
 import numpy as np
 from transformers import (
-    DistilBertTokenizer,
-    DistilBertForSequenceClassification,
+    AutoTokenizer,
+    AutoModel,
 )
+import argparse
 
 
 if torch.cuda.is_available():
@@ -34,7 +35,7 @@ else:
     print("Using CPU.")
 
 
-TOKENIZER_NAME = MODEL_NAME = "tarekziade/pardonmyai"
+TOKENIZER_NAME = MODEL_NAME = "./pardonmyai"
 INPUT_IDS_FILE = "input_ids.pt"
 ATTENTION_MASKS_FILE = "attention_masks.pt"
 LABELS_FILE = "labels.pt"
@@ -55,7 +56,7 @@ def get_tensors():
     else:
         dataset = load_dataset("tarekziade/profanity", split="train")
         dataset = dataset.rename_column("is_offensive", "label")
-        tokenizer = DistilBertTokenizer.from_pretrained(TOKENIZER_NAME)
+        tokenizer = AutoTokenizer.from_pretrained(TOKENIZER_NAME)
 
         def tokenize_function(examples):
             return tokenizer(
@@ -77,7 +78,12 @@ def get_tensors():
     return input_ids, attention_masks, labels
 
 
-def compute_metrics():
+def compute_metrics(tiny=False):
+    if tiny:
+        model_name = MODEL_NAME + "-tiny"
+    else:
+        model_name = MODEL_NAME
+
     # Create the DataLoader
     prediction_data = TensorDataset(*get_tensors())
     prediction_sampler = SequentialSampler(prediction_data)
@@ -87,11 +93,10 @@ def compute_metrics():
 
     # Evaluation
     print("Loading model")
-    model = DistilBertForSequenceClassification.from_pretrained(MODEL_NAME)
+    model = AutoModel.from_pretrained(model_name)
     model.to(device)
     model.eval()
 
-    print("Predicting labels for {:,} test sentences...".format(len(input_ids)))
     predictions, true_labels = [], []
     for batch in tqdm(prediction_dataloader, "predicting"):
         batch = tuple(t.to(device) for t in batch)
@@ -118,7 +123,7 @@ def compute_metrics():
     )
     auc_roc = roc_auc_score(labels_flat, [p[1] for p in predictions])
     return {
-        "accurary": accuracy,
+        "accuracy": accuracy,
         "precision": precision,
         "recall": recall,
         "f1": f1,
@@ -126,11 +131,22 @@ def compute_metrics():
     }
 
 
-if __name__ == "__main__":
-    m = compute_metrics()
+def eval(tiny=False):
+    m = compute_metrics(tiny=tiny)
 
     print(f"Accuracy: {m['accuracy']:.4f}")
     print(f"Precision: {m['precision']:.4f}")
     print(f"Recall: {m['recall']:.4f}")
     print(f"F1 Score: {m['f1']:.4f}")
     print(f"AUC-ROC: {m['auc_roc']:.4f}")
+
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="Train the profanity model")
+    parser.add_argument(
+        "--tiny",
+        action="store_true",
+        help="Enable the tiny mode.",
+    )
+    args = parser.parse_args()
+    eval(args.tiny)
