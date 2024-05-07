@@ -1,16 +1,23 @@
 """
 Infere the text passed in the CLI
 """
-import sys
-import time
 from transformers import pipeline
+
+
+tests = [
+    ("An obese woman playing with her dog in the park", "OFFENSIVE"),
+    ("A black cat liking milk", "NOT_OFFENSIVE"),
+    ("A fat man playing with her dog in the park", "OFFENSIVE"),
+    ("A black cow eating grass", "NOT_OFFENSIVE"),
+    ("An ugly kitten eating food", "OFFENSIVE"),
+]
 
 
 if __name__ == "__main__":
     print("Loading model...")
-    classifier = pipeline("sentiment-analysis", model="./pardonmyai")
+    classifier = pipeline("sentiment-analysis", model="tarekziade/pardonmycaption")
 
-    start = time.time()
-    res = classifier(sys.argv[-1])
-    print(f"Inference took {time.time() - start:.2f} seconds.")
-    print(res)
+    for sentence, expected in tests:
+        print(f"Testing: {sentence}")
+        res = classifier(sentence)
+        assert res[0]["label"] == expected
