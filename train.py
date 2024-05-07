@@ -40,8 +40,12 @@ else:
     print("Using CPU.")
 
 
-def get_datasets(tokenizer):
-    dataset = load_dataset("tarekziade/profanity", split="train")
+def get_datasets(args, tokenizer):
+    if args.fine_tune:
+        dataset = load_dataset("tarekziade/animal_descriptions", split="train")
+    else:
+        dataset = load_dataset("tarekziade/profanity-clean", split="train")
+
     dataset = dataset.rename_column("is_offensive", "label")
 
     def tokenize_function(examples):
@@ -63,7 +67,7 @@ def compute_metrics(eval_pred):
 
 
 training_args = TrainingArguments(
-    output_dir="./results",
+    output_dir="pardonmycaption",
     num_train_epochs=3,
     learning_rate=2e-5,
     per_device_train_batch_size=8,
@@ -78,12 +82,17 @@ training_args = TrainingArguments(
 
 
 @track_emissions(project_name="PardonMyAI")
-def train(tiny=False):
-    if tiny:
+def train(args):
+    if args.tiny:
         model_name = TINY_BASE_MODEL
         model_path = MODEL_PATH + "-tiny"
         tokenizer_klass = BertTokenizer
         model_klass = BertForSequenceClassification
+    elif args.fine_tune:
+        model_name = "tarekziade/pardonmyai"
+        model_path = MODEL_PATH + "-fine-tune"
+        tokenizer_klass = DistilBertTokenizer
+        model_klass = DistilBertForSequenceClassification
     else:
         model_name = BASE_MODEL
         model_path = MODEL_PATH
@@ -96,7 +105,7 @@ def train(tiny=False):
     )
     model.to(device)
 
-    datasets = get_datasets(tokenizer)
+    datasets = get_datasets(args, tokenizer)
 
     trainer = Trainer(
         tokenizer=tokenizer,
@@ -115,6 +124,8 @@ def train(tiny=False):
         model.save_pretrained(model_path)
         tokenizer.save_pretrained(model_path)
 
+    trainer.push_to_hub("tarekziade/pardonmycaption")
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Train the profanity model")
@@ -122,7 +133,15 @@ if __name__ == "__main__":
         "--tiny",
         action="store_true",
         help="Enable the tiny mode.",
+        default=False,
     )
+    parser.add_argument(
+        "--fine-tune",
+        action="store_true",
+        help="Second pass",
+        default=False,
+    )
+
     args = parser.parse_args()
 
-    train(args.tiny)
+    train(args)
